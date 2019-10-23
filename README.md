@@ -10,6 +10,9 @@ It reads from /dev/hwrng and feeds it to the kernel.
 * We feed the Kernel a lot of entropy at a time, this can dominate the entropy pool
 * You have to trust your hwrng
 
+## Build
+	make
+
 ## License
 This project is licensed under the GPL v2 License - see the [COPYING](COPYING) file for details
 
