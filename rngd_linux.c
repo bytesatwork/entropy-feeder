@@ -1,6 +1,8 @@
 /*
  * rngd_linux.c -- Entropy sink for the Linux Kernel (/dev/random)
  *
+ * Modified for stand-alone use 2019 Serafin Leschke (bytesatwork AG)
+ *
  * Copyright (C) 2001 Philipp Rumpf
  *
  * This program is free software; you can redistribute it and/or modify
@@ -20,12 +22,6 @@
 
 #define _GNU_SOURCE
 
-#ifndef HAVE_CONFIG_H
-#error Invalid or missing autoconf build environment
-#endif
-
-#include "rng-tools-config.h"
-
 #include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -42,16 +38,16 @@
 #include <linux/types.h>
 #include <linux/random.h>
 #include <string.h>
+#include <stdbool.h>
 
-#include "rngd.h"
-#include "fips.h"
-#include "exits.h"
-#include "rngd_linux.h"
+#define message(prio, fmt, ...) ; //ignore messages
+#define ENTROPY_PER_BYTE 8
+#define DEFAULT_WATERMARK 4096
 
 /* Kernel output device */
 static int random_fd;
 
-extern int kent_pool_size;
+static int kent_pool_size;
 
 /*
  * Get the default watermark
@@ -68,7 +64,7 @@ int default_watermark(void)
 	 * Default to 4096 if fscanf fails
 	 */
 	if(fscanf(f,"%d", &wm) < 1)
-		wm = 4096;
+		wm = DEFAULT_WATERMARK;
 	kent_pool_size = wm;
 	wm = wm*3/4;
 err:
@@ -92,14 +88,14 @@ void init_kernel_rng(const char* randomdev)
 	if (random_fd == -1) {
 		message(LOG_DAEMON|LOG_ERR, "can't open %s: %s",
 			randomdev, strerror(errno));
-		exit(EXIT_USAGE);
+		exit(EXIT_FAILURE);
 	}
 
 	f = fopen("/proc/sys/kernel/random/write_wakeup_threshold", "w");
 	if (!f) {
 		err = 1;
 	} else {
-		fprintf(f, "%u\n", arguments->fill_watermark);
+		fprintf(f, "%u\n", DEFAULT_WATERMARK);
 		/* Note | not || here... we always want to close the file */
 		err = ferror(f) | fclose(f);
 	}
@@ -122,13 +118,13 @@ int random_add_entropy(void *buf, size_t size)
 
 	struct entropy *ent = alloca(sizeof(struct entropy) + size);
 
-	ent->ent_count = size * arguments->entropy_count;
+	ent->ent_count = size * ENTROPY_PER_BYTE;
 	ent->size = size;
 	memcpy(ent + 1, buf, size);
 
 	if (write_to_output == false) {
 		if (ioctl(random_fd, RNDADDENTROPY, ent) != 0) {
-			if (errno == ENOTTY && !arguments->daemon) {
+			if (errno == ENOTTY) {
 				/*
 				 * This isn't a real random device.
 				 * Switch to plain output if we are in
