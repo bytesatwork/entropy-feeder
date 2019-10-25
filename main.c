@@ -26,9 +26,17 @@
 
 #define RNG_DEV "/dev/hwrng"
 #define RANDOM_DEV "/dev/random"
+
+/**
+ * @def CHUNKSIZE is the number of bytes that are read from the random number
+ * generator and fed to the random device in one go.
+ */
 #define CHUNKSIZE 32
-#define FEEDSIZE 32
-#define NR_OF_CHUNKS ((FEEDSIZE + CHUNKSIZE - 1) / CHUNKSIZE)
+
+/**
+ * @def NR_OF_CHUNKS specifies how often the read and feed loop is executed.
+ */
+#define NR_OF_CHUNKS 1
 
 extern int random_add_entropy(void *buf, size_t size);
 extern void init_kernel_rng(const char* randomdev);
